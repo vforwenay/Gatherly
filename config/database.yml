@@ -1,0 +1,23 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  timeout: 5000
+
+development:
+  <<: *default
+  database: gatherly_development
+  host: <%= ENV.fetch("DB_HOST") { "localhost" } %>
+  username: <%= ENV.fetch("DB_USERNAME") { "gatherly_admin" } %>
+  password: <%= ENV.fetch("DB_PASSWORD") { "mysecretpassword" } %>
+
+test:
+  <<: *default
+  database: gatherly_test
+  host: <%= ENV.fetch("DB_HOST") { "localhost" } %>
+  username: <%= ENV.fetch("DB_USERNAME") { "gatherly_admin" } %>
+  password: <%= ENV.fetch("DB_PASSWORD") { "mysecretpassword" } %>
+
+production:
+  <<: *default
+  url: <%= ENV["DATABASE_URL"] %>

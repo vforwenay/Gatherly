@@ -1,8 +1,126 @@
-# Omakase Ruby styling for Rails
-inherit_gem: { rubocop-rails-omakase: rubocop.yml }
+require: rubocop-rails
 
-# Overwrite or add rules to create your own house style
-#
-# # Use `[a, [b, c]]` not `[ a, [ b, c ] ]`
-# Layout/SpaceInsideArrayLiteralBrackets:
-#   Enabled: false
+AllCops:
+  Exclude:
+    - db/**/*
+    - bin/**/*
+    - client/**/*
+    - Guardfile
+    - '**/*.erb'
+    - Gemfile
+    - tmp/**/*
+    - scripts/**/*
+    - config/**/**
+    - vendor/**/*
+    - spec/spec_helper.rb
+    - spec/rails_helper.rb
+  DisplayCopNames: false
+  DisplayStyleGuide: true
+  StyleGuideCopsOnly: false
+  TargetRubyVersion: 2.3
+  NewCops: enable
+Layout/ParameterAlignment:
+  EnforcedStyle: with_fixed_indentation
+Layout/DotPosition:
+  EnforcedStyle: leading
+Layout/FirstArrayElementIndentation:
+  EnforcedStyle: consistent
+Layout/FirstHashElementIndentation:
+  EnforcedStyle: consistent
+Layout/CaseIndentation:
+  EnforcedStyle: end
+  IndentOneStep: false
+Layout/EndAlignment:
+  EnforcedStyleAlignWith: start_of_line
+Style/BlockDelimiters:
+  EnforcedStyle: braces_for_chaining
+Naming/FileName:
+  Enabled: true
+  Exclude: ['**/jsonapi-resources.rb']
+Style/DateTime:
+  Enabled: false
+Style/FrozenStringLiteralComment:
+  Enabled: false
+Style/GlobalVars:
+  Enabled: false
+Style/GuardClause:
+  Enabled: true
+  MinBodyLength: 3
+Style/PercentLiteralDelimiters:
+  Enabled: true
+  PreferredDelimiters:
+    '%': '[]'
+    '%i': '[]'
+    '%q': '[]'
+    '%Q': '[]'
+    '%r': '{}'
+    '%s': '()'
+    '%w': '[]'
+    '%W': '[]'
+    '%x': '[]'
+Naming/PredicateName:
+  Enabled: true
+  NamePrefix:
+    - is_
+    - has_
+    - have_
+  ForbiddenPrefixes:
+    - is_
+Style/TrivialAccessors:
+  Enabled: true
+  AllowDSLWriters: true
+Style/WordArray:
+  Enabled: true
+  MinSize: 2
+Metrics/BlockNesting:
+  Enabled: true
+  Max: 6
+Metrics/ClassLength:
+  Enabled: true
+  CountComments: false
+  Max: 500
+Metrics/ModuleLength:
+  Enabled: true
+  CountComments: false
+  Max: 500
+Layout/LineLength:
+  Enabled: true
+  Max: 120
+  AllowURI: true
+  Exclude:
+    - config/routes.rb
+    - spec/*.*
+Lint/AssignmentInCondition:
+  Enabled: true
+  AllowSafeAssignment: true
+Style/Alias:
+  Enabled: true
+  EnforcedStyle: prefer_alias_method
+Style/Documentation:
+  Enabled: false
+Style/IfWithSemicolon:
+  Enabled: true
+Style/Lambda:
+  EnforcedStyle: literal
+  # HACK: Until Rubocop is released with EnforcedStyle
+  Enabled: true
+Lint/RequireParentheses:
+  Enabled: false
+Rails/HasAndBelongsToMany:
+  Enabled: false
+Rails/TimeZone:
+  Enabled: false
+Metrics/CyclomaticComplexity:
+  Enabled: false
+Metrics/PerceivedComplexity:
+  Enabled: false
+Metrics/AbcSize:
+  Enabled: false
+Metrics/MethodLength:
+  Enabled: false
+Metrics/BlockLength:
+  Enabled: true
+  Max: 40
+  Exclude:
+    - spec/**/*
+    - lib/tasks/*.rake

@@ -1,66 +1,140 @@
-name: CI
+name: Gatherly CI/CD Pipeline
 
 on:
-  pull_request:
   push:
-    branches: [ main ]
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  scan_ruby:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: .ruby-version
-          bundler-cache: true
-
-      - name: Scan for common Rails security vulnerabilities using static analysis
-        run: bin/brakeman --no-pager
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: .ruby-version
-          bundler-cache: true
-
-      - name: Lint code for consistent style
-        run: bin/rubocop -f github
-
   test:
+    name: Run Tests (RSpec & Quality)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [rspec, rubocop]
+    services:
+      db:
+        image: postgres:13
+        ports:
+          - "5432:5432"
+        env:
+          POSTGRES_USER: gatherly_admin
+          POSTGRES_PASSWORD: mysecretpassword
+          POSTGRES_DB: gatherly_test
+        options: >-
+          --health-cmd="pg_isready -U gatherly_admin -d gatherly_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
-    # services:
-    #  redis:
-    #    image: redis
-    #    ports:
-    #      - 6379:6379
-    #    options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
-      - name: Install packages
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y build-essential git pkg-config
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Cache Gems
+        uses: actions/cache@v3
+        with:
+          path: vendor/bundle
+          key: ${{ runner.os }}-bundle-${{ hashFiles('Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bundle-
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          ruby-version: 3.3.1
           bundler-cache: true
 
-      - name: Run tests
+      - name: Install Yarn Dependencies
+        run: yarn install
+
+      - name: Wait for DB to be ready
+        run: |
+          while ! pg_isready -h localhost -U gatherly_admin -d gatherly_test; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 5
+          done
+
+      - name: Run ${{ matrix.task }}
         env:
           RAILS_ENV: test
-          # REDIS_URL: redis://localhost:6379/0
-        run: bin/rails db:test:prepare test
+        run: |
+          if [ "${{ matrix.task }}" == "rspec" ]; then
+            bin/rails db:create db:migrate
+            bundle exec rspec
+          elif [ "${{ matrix.task }}" == "rubocop" ]; then
+            bundle exec rubocop
+          fi
+
+  security_check:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Cache Security Tools
+        uses: actions/cache@v3
+        with:
+          path: ~/.local
+          key: ${{ runner.os }}-security-tools
+          restore-keys: |
+            ${{ runner.os }}-security-tools
+
+      - name: Install Security Tools
+        run: |
+          sudo gem install bundler-audit brakeman
+
+      - name: Run Security Audit
+        run: |
+          bundle-audit check --update
+          brakeman -q
+
+  docker_build:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [test, security_check]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/app:latest .
+
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/app:latest
+
+# Uncomment the deploy and coverage_check jobs when needed
+# deploy:
+#   name: Deploy to Staging
+#   runs-on: ubuntu-latest
+#   needs: docker_build
+#   steps:
+#     - name: Deploy Application
+#       run: |
+#         docker pull ${{ secrets.DOCKER_USERNAME }}/app:latest
+#         docker run -d --name app-container -p 80:80 ${{ secrets.DOCKER_USERNAME }}/app:latest
+
+# coverage_check:
+#   name: Coverage Check
+#   runs-on: ubuntu-latest
+#   needs: test
+#   steps:
+#     - name: Checkout Code
+#       uses: actions/checkout@v3
+#     - name: Upload Coverage
+#       uses: codecov/codecov-action@v3
+#       with:
+#         token: ${{ secrets.CODECOV_TOKEN }}

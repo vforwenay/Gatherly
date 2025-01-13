@@ -24,9 +24,8 @@ services:
     image: postgres:13
     container_name: gatherly_postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: gatherly_development
+      POSTGRES_USER: gatherly_admin
+      POSTGRES_PASSWORD: mysecretpassword
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Cache Gems
         uses: actions/cache@v3
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Cache Security Tools
         uses: actions/cache@v3
@@ -100,7 +100,7 @@ jobs:
     needs: [test, security_check]
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Log in to DockerHub
         uses: docker/login-action@v2
@@ -133,7 +133,7 @@ jobs:
 #   needs: test
 #   steps:
 #     - name: Checkout Code
-#       uses: actions/checkout@v3
+#       uses: actions/checkout@v4
 #     - name: Upload Coverage
 #       uses: codecov/codecov-action@v3
 #       with:

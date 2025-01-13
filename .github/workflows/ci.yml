@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: Gatherly CI/CD Pipeline
 
 on:
   push:
@@ -9,72 +9,128 @@ on:
       - main
 
 jobs:
-  build:
+  test:
+    name: Run Tests (RSpec & Quality)
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        task: [rspec, rubocop]
     services:
-      postgres:
+      db:
         image: postgres:13
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: my_database
         ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          - "5432:5432"
+        env:
+          POSTGRES_USER: gatherly_admin
+          POSTGRES_PASSWORD: mysecretpassword
+          POSTGRES_DB: gatherly_test
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      # Checkout the code
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v1
+      # Cache Gems
+      - name: Cache Gems
+        uses: actions/cache@v3
+        with:
+          path: vendor/bundle
+          key: ${{ runner.os }}-bundle-${{ hashFiles('Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bundle-
 
-      - name: Build Docker image
+      # Setup Ruby Environment
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.1
+          bundler-cache: true
+
+      # Install and cache Node.js dependencies
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: "npm"
+
+      # Install Yarn Dependencies
+      - name: Install Yarn Dependencies
+        run: yarn install
+
+      # Run Tasks (RSpec and RuboCop)
+      - name: Run ${{ matrix.task }}
+        env:
+          RAILS_ENV: test
         run: |
-          docker build -t gatherly-rails .
+          if [ "${{ matrix.task }}" == "rspec" ]; then
+            bin/rails db:create db:migrate
+            bundle exec rspec
+          elif [ "${{ matrix.task }}" == "rubocop" ]; then
+            bundle exec rubocop
+          fi
 
-      - name: Set up Ruby version
+  security_check:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3.1
 
-      - name: Set up Bundler
-        run: gem install bundler -v 2.5.14
-
-      - name: Install gems
+      - name: Run Security Audit
         run: |
-          docker run --rm -v $(pwd):/app -w /app gatherly-rails bundle install
+          gem install bundler-audit brakeman
+          bundle-audit check --update
+          brakeman -q
 
-      - name: Prepare Database
-        run: |
-          docker run --rm -v $(pwd):/app -w /app gatherly-rails bundle exec rake db:create db:migrate
-
-      - name: Run RSpec tests
-        run: |
-          docker run --rm -v $(pwd):/app -w /app gatherly-rails bundle exec rspec
-
-      - name: Run RuboCop
-        run: |
-          docker run --rm -v $(pwd):/app -w /app gatherly-rails bundle exec rubocop
-
-      - name: Cache gems
-        uses: actions/cache@v2
-        with:
-          path: /bundle
-          key: ${{ runner.os }}-gems-${{ hashFiles('**/Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-gems-
-
-  lint:
+  docker_build:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
+    needs: [test, security_check]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      - name: Run RuboCop Linting
+      - name: Log in to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker Image
         run: |
-          gem install rubocop -v 1.27.0
-          rubocop --format simple
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/app:latest .
+
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/app:latest
+
+## Will work on later
+  # deploy:
+  #   name: Deploy to Staging
+  #   runs-on: ubuntu-latest
+  #   needs: docker_build
+  #   steps:
+  #     - name: Deploy Application
+  #       run: |
+  #         docker pull ${{ secrets.DOCKER_USERNAME }}/app:latest
+  #         docker run -d --name app-container -p 80:80 ${{ secrets.DOCKER_USERNAME }}/app:latest
+
+  # coverage_check:
+  #   name: Coverage Check
+  #   runs-on: ubuntu-latest
+  #   needs: test
+
+  #   steps:
+  #     - name: Checkout Code
+  #       uses: actions/checkout@v3
+
+  #     - name: Upload Coverage
+  #       uses: codecov/codecov-action@v3
+  #       with:
+  #         token: ${{ secrets.CODECOV_TOKEN }}

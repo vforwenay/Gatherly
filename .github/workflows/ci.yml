@@ -24,13 +24,16 @@ jobs:
           POSTGRES_USER: gatherly_admin
           POSTGRES_PASSWORD: mysecretpassword
           POSTGRES_DB: gatherly_test
+        options: >-
+          --health-cmd="pg_isready -U gatherly_admin -d gatherly_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
-      # Checkout the code
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Cache Gems
       - name: Cache Gems
         uses: actions/cache@v3
         with:
@@ -39,25 +42,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bundle-
 
-      # Setup Ruby Environment
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3.1
           bundler-cache: true
 
-      # Install and cache Node.js dependencies
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 16
-          cache: "npm"
-
-      # Install Yarn Dependencies
       - name: Install Yarn Dependencies
         run: yarn install
 
-      # Run Tasks (RSpec and RuboCop)
       - name: Run ${{ matrix.task }}
         env:
           RAILS_ENV: test
@@ -72,19 +65,24 @@ jobs:
   security_check:
     name: Security Audit
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+      - name: Cache Security Tools
+        uses: actions/cache@v3
         with:
-          ruby-version: 3.3.1
+          path: ~/.local
+          key: ${{ runner.os }}-security-tools
+          restore-keys: |
+            ${{ runner.os }}-security-tools
+
+      - name: Install Security Tools
+        run: |
+          gem install bundler-audit brakeman
 
       - name: Run Security Audit
         run: |
-          gem install bundler-audit brakeman
           bundle-audit check --update
           brakeman -q
 
@@ -110,27 +108,25 @@ jobs:
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/app:latest
 
-## Will work on later
-  # deploy:
-  #   name: Deploy to Staging
-  #   runs-on: ubuntu-latest
-  #   needs: docker_build
-  #   steps:
-  #     - name: Deploy Application
-  #       run: |
-  #         docker pull ${{ secrets.DOCKER_USERNAME }}/app:latest
-  #         docker run -d --name app-container -p 80:80 ${{ secrets.DOCKER_USERNAME }}/app:latest
+# Uncomment the deploy and coverage_check jobs when needed
+# deploy:
+#   name: Deploy to Staging
+#   runs-on: ubuntu-latest
+#   needs: docker_build
+#   steps:
+#     - name: Deploy Application
+#       run: |
+#         docker pull ${{ secrets.DOCKER_USERNAME }}/app:latest
+#         docker run -d --name app-container -p 80:80 ${{ secrets.DOCKER_USERNAME }}/app:latest
 
-  # coverage_check:
-  #   name: Coverage Check
-  #   runs-on: ubuntu-latest
-  #   needs: test
-
-  #   steps:
-  #     - name: Checkout Code
-  #       uses: actions/checkout@v3
-
-  #     - name: Upload Coverage
-  #       uses: codecov/codecov-action@v3
-  #       with:
-  #         token: ${{ secrets.CODECOV_TOKEN }}
+# coverage_check:
+#   name: Coverage Check
+#   runs-on: ubuntu-latest
+#   needs: test
+#   steps:
+#     - name: Checkout Code
+#       uses: actions/checkout@v3
+#     - name: Upload Coverage
+#       uses: codecov/codecov-action@v3
+#       with:
+#         token: ${{ secrets.CODECOV_TOKEN }}

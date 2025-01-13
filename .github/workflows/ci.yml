@@ -87,7 +87,7 @@ jobs:
 
       - name: Install Security Tools
         run: |
-          gem install bundler-audit brakeman
+          sudo gem install bundler-audit brakeman
 
       - name: Run Security Audit
         run: |
